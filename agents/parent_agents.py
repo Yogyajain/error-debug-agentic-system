@@ -7,7 +7,7 @@ import json
 from agents.helper import agent_2
 from langgraph.constants import Send
 import os
-from agents.helper import chain_log_parser
+from agents.helper import chain_log_parser, chain_error_detector, chain_root_cause_analyzer, chain_solution_generator, chain_report_generator
 from datetime import datetime
 import json
 
@@ -19,25 +19,32 @@ class finalstate(TypedDict):
     root_causes: list[Dict]  # Root cause analysis for each error
     solutions: list[Dict]  # Proposed solutions
     final_report: str  # Comprehensive report
-    current_step: str  # Track current workflow step
 
 def log_parser(finalstate):
     log_files = finalstate['log_files']
+    log_files = []
     for log_file in log_files:
         response = chain_log_parser.invoke(log_file['content'])
     if isinstance(response, str):
         response = json.loads(response)
-    print("Parsed Logs from log parser:", response)
-    return {finalstate['parsed_logs'] : response} 
+        response['name'] = log_file['name']
+        response['type'] = log_file['type']
+        log_files.append(response)
+    print("Parsed Logs from log parser:", log_files)
+    return {finalstate['parsed_logs'] : log_files} 
 
 def error_detector(finalstate):
     parsed_logs = finalstate['parsed_logs']
+    error_summary = []
     for parsed_log in parsed_logs:
         response = chain_error_detector.invoke(json.dumps(parsed_log))
     if isinstance(response, str):
         response = json.loads(response)
-    print("Identified Errors from error detector:", response)
-    return {finalstate['identified_errors'] : response}
+        response['name'] = parsed_log['name']
+        response['type'] = parsed_log['type']
+        error_summary.append(response)
+    print("Identified Errors from error detector:", error_summary)
+    return {finalstate['identified_errors'] : error_summary}
 
 def analyze_root_cause(finalstate):
     identified_errors = finalstate['identified_errors']
