@@ -24,7 +24,7 @@ def log_parser(finalstate):
     log_files = finalstate['log_files']
     log_files = []
     for log_file in log_files:
-        response = chain_log_parser.invoke(log_file['content'])
+        response = chain_log_parser.invoke({"raw_log_file":log_file['content']})
     if isinstance(response, str):
         response = json.loads(response)
         response['name'] = log_file['name']
