@@ -7,7 +7,7 @@ import re
 from dotenv import load_dotenv
 from langchain_google_genai import ChatGoogleGenerativeAI
 import os
-
+load_dotenv()
 
 os.environ["GOOGLE_API_KEY"]
 llm = ChatGoogleGenerativeAI(model="gemini-3-flash-preview")
@@ -41,13 +41,13 @@ For each log file, extract and return:
 3. **Log Statistics**
    - total_entries
    - log_level_distribution:
-     {
+     {{
        "ERROR": count,
        "WARNING": count,
        "INFO": count,
        "DEBUG": count,
        "UNKNOWN": count
-     }
+     }}
 
 4. **Detected Components / Modules**
    - List of affected components, services, classes, or files mentioned in logs
@@ -79,38 +79,38 @@ For each log file, extract and return:
 ────────────────────────────────────────
 Return ONLY a valid JSON object in the following structure:
 
-{
-  "log_metadata": {
+{{
+  "log_metadata": {{
     "log_name": "",
     "log_type": "",
     "source_component": ""
-  },
-  "time_range": {
+  }},
+  "time_range": {{
     "start_timestamp": "",
     "end_timestamp": "",
     "timezone": ""
-  },
-  "statistics": {
+  }},
+  "statistics": {{
     "total_entries": 0,
-    "log_level_distribution": {
+    "log_level_distribution": {{
       "ERROR": 0,
       "WARNING": 0,
       "INFO": 0,
       "DEBUG": 0,
       "UNKNOWN": 0
-    }
-  },
+    }}
+  }},
   
   "structured_entries": [
-    {
+    {{
       "timestamp": "",
       "log_level": "",
       "component": "",
       "message": "",
       "raw_line_reference": ""
-    }
+    }}
   ]
-}
+}}
 
 ────────────────────────────────────────
 ❌ OUTPUT CONSTRAINTS
@@ -123,25 +123,25 @@ Return ONLY a valid JSON object in the following structure:
 ────────────────────────────────────────
 📌 EXAMPLES OUTPUT
 ────────────────────────────────────────
-{
-  "log_file": {
+{{
+  "log_file": {{
     "name": "app.log",
     "type": "application",
     "source": "web-service",
-    "time_range": {
+    "time_range": {{
       "start": "2026-01-29T09:58:12Z",
       "end": "2026-01-29T10:12:45Z"
-    },
+    }},
     "total_entries": 12450
-   },
-  "log_level_counts": {
+   }},
+  "log_level_counts": {{
     "INFO": 10320,
     "WARN": 1530,
     "ERROR": 580,
     "DEBUG": 20
-  },
+  }},
   "parsed_entries": [
-    {
+    {{
       "timestamp": "2026-01-29T10:02:14Z",
       "level": "ERROR",
       "message": "Database connection timeout",
@@ -149,27 +149,24 @@ Return ONLY a valid JSON object in the following structure:
       "error_code": "DB_TIMEOUT",
       "stack_trace": true,
       "raw_line": "2026-01-29 10:02:14 ERROR OrderService - Database connection timeout"
-    }
+    }}
   ],
-  "patterns": {
+  "patterns": {{
     "repeated_messages": [
-      {
+      {{
         "message": "Database connection timeout",
         "count": 127
-      }
+      }}
     ]
-  }
-}
+  }}
+}}
 """),
 
     ("human", '''
 You are given the following input:
 
-Log Metadata:
-{log_metadata}
-
 Raw Log Content:
-{raw_log_content}
+{raw_log_file}
 
 Parse the logs according to the rules above and return ONLY the structured JSON output.
      ''')
@@ -204,7 +201,8 @@ You must follow these rules:
 - If a field is not present in the data, set it to null.
 - Every identified error MUST be supported by evidence from the logs.
 - If no errors are found, return an empty result with an explanation.
-
+- Do NOT escape quotes with backslashes
+- Directly give the output in JSON format without any extra text. like ``` json ... ```.
 Your output must be valid JSON and must strictly follow the provided schema.
 
 """),
@@ -218,7 +216,7 @@ parsed entries contains details about the error like error message, error code, 
 Analyze the data and produce an error detection report following the exact JSON schema.
 
 Parsed Logs:
-{parsed_logs_json}
+{parsed_log_json}
 
 Return ONLY valid JSON in the following format:
 {{

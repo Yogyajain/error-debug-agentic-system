@@ -1,4 +1,6 @@
 
+from agents.parent_agents import graph_final
+from agents.helper import chain_log_parser,chain_error_detector
 def create_sample_logs():
     """Create sample log files for demonstration"""
     
@@ -74,3 +76,10 @@ def create_sample_logs():
         }
     ]
 
+# res = graph_final.invoke({
+#     "log_files": create_sample_logs()
+# })
+
+res1=chain_log_parser.invoke({"raw_log_file": create_sample_logs()[0]['content']})
+res=chain_error_detector.invoke({"parsed_log_json": res1})
+print("Final Result:", res)
