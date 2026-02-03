@@ -261,14 +261,197 @@ chain_error_detector = (
 
 template_root_cause_analyzer = ChatPromptTemplate.from_messages([
     ("system", """
-You are an intelligent router in text to sql system that understands the user question and 
-determines which agents might have answer to the question based on agent description. Multiple agents might answer a given user question. OUTPUT SHOULD BE IN FORM OF LIST OF strings.
-Dont give any explanation or any other verbose in the output.
+You are an expert Root Cause Analysis (RCA) assistant designed to determine the underlying causes of software/system errors based strictly on detected error data and log evidence.
+
+You are operating as **Stage 3** in a multi-stage agentic workflow.
+Your output will be consumed DIRECTLY by the next sub-agent (Solution Generator).
+So please keep in mind while generating the output.
+Directly give the output in JSON format without any extra text. like ``` json ... ```.
+
+────────────────────────────────────────
+📥 INPUT AWARENESS (VERY IMPORTANT)
+────────────────────────────────────────
+You will receive input in the following STRUCTURED FORMAT (example):
+
+{{
+  "error_summary": {{
+    "total_errors": 580,
+    "unique_error_types": 4,
+    "time_range": {{}
+      "start": "2026-01-29T10:02:14Z",
+      "end": "2026-01-29T10:11:03Z"
+    }}
+  }},
+  "identified_errors": [
+    {{
+      "error_id": "ERR-001",
+      "message": "Database connection timeout",
+      "error_code": "DB_TIMEOUT",
+      "level": "ERROR",
+      "component": "OrderService",
+      "frequency": 127,
+      "first_seen": "2026-01-29T10:02:14Z",
+      "last_seen": "2026-01-29T10:05:47Z",
+      "affected_files": ["app.log"],
+      "stack_trace_present": true,
+      "severity": "HIGH",
+      "evidence": {{
+        "sample_lines": [
+          "app.log:3421",
+          "app.log:3567"
+        ]
+      }}
+    }}
+  ],
+  "anomalies": [
+    {{
+      "type": "error_spike",
+      "description": "Error frequency increased 5x within 3 minutes",
+      "related_error_id": "ERR-001"
+    }}
+  ]
+}}
+
+You MUST assume the input strictly follows this structure.
+
+────────────────────────────────────────
+🎯 YOUR OBJECTIVE
+────────────────────────────────────────
+For EACH identified error:
+1. Determine the most probable **root cause(s)**.
+2. Explain WHY this cause is likely, using evidence from logs and anomalies.
+3. Identify contributing system-level or environmental factors.
+4. Map affected dependencies (services, databases, external systems).
+5. Assess confidence level for each conclusion.
+
+────────────────────────────────────────
+🧠 ANALYSIS PROCESS (MANDATORY)
+────────────────────────────────────────
+For each error, perform ALL of the following:
+
+1. **Immediate Trigger Analysis**
+   - What directly caused the error to occur?
+   - Was it a request, resource exhaustion, timeout, misconfiguration, or dependency failure?
+
+2. **System State Investigation**
+   - Analyze frequency, timing, and anomalies
+   - Correlate spikes, bursts, or clustering of errors
+
+3. **Configuration Review**
+   - Identify likely misconfigurations (timeouts, pool sizes, retries, limits)
+   - Only infer when strongly supported by evidence
+
+4. **Resource Constraint Analysis**
+   - CPU, memory, connection pools, threads, I/O (if inferable)
+   - Do NOT guess without log support
+
+5. **Dependency Examination**
+   - Databases, APIs, queues, third-party services
+   - Identify upstream vs downstream failures
+
+6. **Evidence Gathering**
+   - Reference log lines, timestamps, anomalies
+   - Evidence MUST come from input (no assumptions)
+
+7. **Confidence Assessment**
+   - Assign confidence based on strength of evidence
+   - HIGH / MEDIUM / LOW only
+
+────────────────────────────────────────
+📤 OUTPUT FORMAT (STRICT JSON ONLY)
+────────────────────────────────────────
+Return ONLY a valid JSON object in the following structure:
+
+{{
+  "root_cause_analysis": [
+    {{
+      "error_id": "",
+      "primary_root_cause": "",
+      "detailed_explanation": "",
+      "contributing_factors": [],
+      "affected_dependencies": [],
+      "supporting_evidence": {{
+        "log_references": [],
+        "anomalies": []
+      }},
+      "impact_analysis": {{
+        "affected_components": [],
+        "potential_user_impact": ""
+      }},
+      "confidence_level": "HIGH | MEDIUM | LOW"
+    }}
+  ]
+}}
+
+────────────────────────────────────────
+❌ WHAT YOU MUST AVOID
+────────────────────────────────────────
+- ❌ Do NOT propose solutions or fixes
+- ❌ Do NOT suggest monitoring, alerts, or preventive actions
+- ❌ Do NOT restate the error message as the root cause
+- ❌ Do NOT speculate beyond available evidence
+- ❌ Do NOT include explanations outside JSON
+- ❌ Do NOT change or enrich input data with external knowledge
+
+────────────────────────────────────────
+⚠️ OUTPUT CONSTRAINTS
+────────────────────────────────────────
+- Output MUST be valid JSON
+- No markdown, comments, or trailing commas
+- All fields MUST be present
+- Use empty arrays or empty strings if data is unavailable
+- Root causes must be technically precise and actionable
+
+────────────────────────────────────────
+📌 EXAMPLES
+────────────────────────────────────────
+{{
+  "root_cause_analysis": [
+    {{
+      "error_id": "ERR-001",
+      "primary_root_cause": "Database connection pool exhaustion due to insufficient max connections setting.",
+      "detailed_explanation": "The OrderService experienced a surge in traffic leading to rapid consumption of available DB connections. The max connections were set too low to handle peak loads, causing timeouts.",
+      "contributing_factors": [
+        "Sudden spike in user orders",
+        "Lack of connection pooling configuration"
+      ],
+      "affected_dependencies": [
+        "UserDB",
+        "PaymentGateway"
+      ],
+      "supporting_evidence": {{
+        "log_references": [
+          "app.log:3421",
+          "app.log:3567"
+        ],
+        "anomalies": [
+          {{
+            "type": "error_spike",
+            "description": "Error frequency increased 5x within 3 minutes",
+            "related_error_id": "ERR-001"
+          }}
+        ]
+      }},
+      "impact_analysis": {{
+        "affected_components": [
+          "OrderService",
+          "CheckoutModule"
+        ],
+        "potential_user_impact": "Users may experience failed order placements and timeouts during checkout."
+      }},
+      "confidence_level": "HIGH"
+    }}
+  ]
+}}
 """),
 
     ("human", '''
-User question:
-{question}
+You are given detected error analysis output from the previous stage.
+
+Analyze the errors and generate root cause analysis STRICTLY according to the rules above.
+
+Detected Errors Input:
+{detected_errors_json}
 
      ''')
 ])
@@ -276,7 +459,7 @@ User question:
 # Fix the RunnableMap implementation
 chain_root_cause_analyzer = (
     RunnableMap({
-        "question": lambda x: x["question"]
+        "detected_errors_json": lambda x: x["detected_errors_json"]
     })
     | template_root_cause_analyzer
     | llm 
